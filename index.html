@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pittsburgh Daylight Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --bg:       #f4f1eb;
+  --surface:  #ffffff;
+  --surface2: #ede9e1;
+  --surface3: #e4dfd5;
+  --border:   #d0c9bc;
+  --border2:  #bfb8aa;
+  --ink:      #1c1814;
+  --ink2:     #3a342d;
+  --ink3:     #6b6055;
+  --ink4:     #9e9488;
+
+  --gold:     #b8651a;
+  --gold-lt:  #f5e6d3;
+  --blue:     #1e3f6e;
+  --blue-lt:  #dde8f5;
+  --teal:     #14635a;
+
+  /* metric colors */
+  --sda-hi:   #1a6b42;
+  --sda-mid:  #b8651a;
+  --sda-lo:   #8b2020;
+
+  --header-h: 54px;
+  --pc-h:     200px;  /* parallel coord chart height */
+  --thumb-w:  148px;
+
+  --ff-display: 'Syne', sans-serif;
+  --ff-mono:    'DM Mono', monospace;
+  --ff-body:    'Instrument Sans', sans-serif;
+}
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--ff-body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+/* ═══════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════ */
+#header {
+  height: var(--header-h);
+  background: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 200;
+  border-bottom: 2px solid var(--gold);
+}
+#wordmark {
+  font-family: var(--ff-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #f5c842;
+  flex-shrink: 0;
+}
+#header-divider {
+  width:1px; height:22px; background:rgba(255,255,255,.12); flex-shrink:0;
+}
+#study-title {
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,.4);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#counter-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-shrink: 0;
+}
+#count-num {
+  font-family: var(--ff-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: #f5c842;
+  line-height: 1;
+}
+#count-of {
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  color: rgba(255,255,255,.3);
+}
+.hdr-btn {
+  padding: 5px 13px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: none;
+  color: rgba(255,255,255,.5);
+  font-family: var(--ff-mono);
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hdr-btn:hover { border-color: #f5c842; color: #f5c842; }
+.hdr-btn.primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
+  font-weight: 500;
+}
+.hdr-btn.primary:hover { background: #c97420; }
+
+/* Load CSV label */
+#load-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 3px;
+  color: rgba(255,255,255,.5);
+  font-family: var(--ff-mono);
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#load-label:hover { border-color: #f5c842; color: #f5c842; }
+#file-input { display:none; }
+
+/* Sort select */
+#sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+#sort-wrap label {
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: rgba(255,255,255,.35);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#sort-select {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.7);
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════
+   SHELL
+═══════════════════════════════════════════ */
+#shell {
+  height: calc(100vh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   PARALLEL COORDINATES
+═══════════════════════════════════════════ */
+#pc-section {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px 10px;
+  user-select: none;
+}
+#pc-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0 6px;
+}
+.pc-bar-label {
+  font-family: var(--ff-mono);
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink4);
+  white-space: nowrap;
+}
+.pc-bar-sep { flex:1; height:1px; background:var(--border); }
+.pc-bar-sep.out { background: color-mix(in srgb, var(--blue) 30%, var(--border)); }
+
+#pc-svg { width:100%; display:block; overflow:visible; }
+
+/* axis styles applied via D3 */
+.axis-label-input {
+  font-family: 'DM Mono';
+  font-size: 10.5px;
+  font-weight: 500;
+  fill: var(--ink2);
+}
+.axis-label-output {
+  font-family: 'DM Mono';
+  font-size: 10.5px;
+  font-weight: 500;
+  fill: var(--blue);
+}
+.axis-type-tag {
+  font-family: 'DM Mono';
+  font-size: 7px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.axis-line { stroke: var(--border2); stroke-width: 1.5; }
+.tick-val { font-family: 'DM Mono'; font-size: 8px; fill: var(--ink4); }
+.threshold-dash { stroke: var(--blue); stroke-width:1; stroke-dasharray:3,3; opacity:.5; }
+.threshold-lbl  { font-family:'DM Mono'; font-size:7.5px; fill:var(--blue); }
+
+/* PC row segments */
+.pc-row { transition: opacity .15s; cursor: pointer; }
+.pc-row path { fill: none; stroke-linecap: round; }
+
+/* brush selection rect */
+.brush-sel {
+  fill: rgba(184,101,26,.12);
+  stroke: var(--gold);
+  stroke-width: 1.5;
+  rx: 2;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════
+   RESULTS AREA
+═══════════════════════════════════════════ */
+#results-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#results-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 18px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: var(--ink3);
+}
+.legend-swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+.results-hint {
+  margin-left: auto;
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: var(--ink4);
+  font-style: italic;
+}
+
+#thumbs-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px 40px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--thumb-w), 1fr));
+  align-content: start;
+}
+
+/* ═══════════════════════════════════════════
+   THUMBNAIL CARD
+═══════════════════════════════════════════ */
+.thumb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+  position: relative;
+}
+.thumb-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 3px 14px rgba(184,101,26,.15);
+  transform: translateY(-1px);
+}
+.thumb-card.selected {
+  border-color: var(--sda-hi);
+  box-shadow: 0 0 0 2px rgba(26,107,66,.25);
+}
+.thumb-card.dimmed { opacity: 0.22; pointer-events: none; }
+
+/* sDA colour strip at top */
+.card-strip {
+  height: 4px;
+  width: 100%;
+}
+/* heatmap image area */
+.card-img-wrap {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: linear-gradient(to bottom right, #1e3d6e 0%, #b8651a 55%, #f5c842 100%);
+  position: relative;
+  overflow: hidden;
+}
+.card-img-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.card-img-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: rgba(255,255,255,.45);
+  letter-spacing: 1px;
+}
+/* run ID badge */
+.card-run-id {
+  position: absolute;
+  top: 4px; left: 5px;
+  background: rgba(0,0,0,.45);
+  border-radius: 2px;
+  font-family: var(--ff-mono);
+  font-size: 7px;
+  color: rgba(255,255,255,.8);
+  padding: 1px 4px;
+  pointer-events: none;
+}
+
+.card-body {
+  padding: 7px 8px 8px;
+}
+/* 2×2 KPI grid */
+.card-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.card-kpi {
+  background: var(--surface2);
+  border-radius: 2px;
+  padding: 3px 6px;
+}
+.card-kpi-label {
+  font-family: var(--ff-mono);
+  font-size: 6.5px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--ink4);
+  margin-bottom: 1px;
+}
+.card-kpi-val {
+  font-family: var(--ff-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+/* param summary */
+.card-params {
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: var(--ink4);
+  line-height: 1.75;
+  border-top: 1px solid var(--border);
+  padding-top: 5px;
+}
+.card-params span { color: var(--ink2); }
+
+/* ═══════════════════════════════════════════
+   DETAIL PANEL (slide up from bottom-right)
+═══════════════════════════════════════════ */
+#detail-panel {
+  position: fixed;
+  right: 0; bottom: 0;
+  width: 340px;
+  max-height: 60vh;
+  background: var(--surface);
+  border-top: 2px solid var(--gold);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px -4px 28px rgba(0,0,0,.10);
+  border-radius: 6px 0 0 0;
+  z-index: 300;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#detail-panel.open { transform: translateY(0); }
+
+#detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+}
+#detail-title {
+  font-family: var(--ff-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+#detail-close {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: none;
+  font-size: 10px;
+  cursor: pointer;
+  color: var(--ink4);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .1s, color .1s;
+}
+#detail-close:hover { border-color: var(--sda-lo); color: var(--sda-lo); }
+
+#detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+.detail-section { margin-bottom: 14px; }
+.detail-section-label {
+  font-family: var(--ff-mono);
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink4);
+  margin-bottom: 7px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.detail-kpi {
+  background: var(--surface2);
+  border-radius: 3px;
+  padding: 9px 11px;
+}
+.detail-kpi-label {
+  font-family: var(--ff-mono);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--ink4);
+  margin-bottom: 3px;
+}
+.detail-kpi-val {
+  font-family: var(--ff-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.detail-kpi-desc {
+  font-family: var(--ff-mono);
+  font-size: 7px;
+  color: var(--ink4);
+  margin-top: 2px;
+}
+
+/* context bar */
+.ctx-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.ctx-label { font-family:var(--ff-mono); font-size:8.5px; color:var(--ink4); width:32px; flex-shrink:0; }
+.ctx-track { flex:1; height:9px; background:var(--surface2); border-radius:2px; overflow:hidden; }
+.ctx-fill  { height:100%; border-radius:2px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+.ctx-val   { font-family:var(--ff-mono); font-size:8.5px; width:30px; flex-shrink:0; text-align:right; }
+
+.param-table { width:100%; border-collapse:collapse; }
+.param-table td {
+  padding: 5px 8px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.param-table td:first-child { color:var(--ink4); }
+.param-table td:last-child  { color:var(--ink2); font-weight:500; }
+
+/* ═══════════════════════════════════════════
+   EMPTY / INFO STATES
+═══════════════════════════════════════════ */
+#empty-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  gap: 12px;
+  text-align: center;
+}
+#empty-state.visible { display:flex; }
+#empty-icon { font-size: 42px; opacity:.3; }
+#empty-title {
+  font-family: var(--ff-display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--ink4);
+}
+#empty-sub {
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  color: var(--ink4);
+  line-height: 2;
+  max-width: 400px;
+}
+
+/* ═══════════════════════════════════════════
+   FOOTNOTE BAR
+═══════════════════════════════════════════ */
+#footnote {
+  position: fixed;
+  bottom: 0; left: 0;
+  right: 340px;
+  padding: 4px 18px;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  font-family: var(--ff-mono);
+  font-size: 8px;
+  color: var(--ink4);
+  line-height: 1.7;
+  z-index: 100;
+}
+#footnote em { color:var(--gold); font-style:normal; }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(5px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.card-appear { animation: fadeUp .2s ease both; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div id="header">
+  <div id="wordmark">DAYLIGHT EXPLORER</div>
+  <div id="header-divider"></div>
+  <div id="study-title">Pittsburgh Office-to-Residential · Parametric Daylighting Study · CMU MS Sustainable Design</div>
+
+  <div id="counter-wrap">
+    <span id="count-num">—</span>
+    <span id="count-of">/ —</span>
+  </div>
+  <span style="font-family:var(--ff-mono);font-size:8px;color:rgba(255,255,255,.25);letter-spacing:1px">runs</span>
+
+  <div id="sort-wrap">
+    <label>Sort</label>
+    <select id="sort-select" onchange="renderThumbs()">
+      <option value="sDA_desc">sDA ↓ highest</option>
+      <option value="DA_desc">DA ↓ highest</option>
+      <option value="UDI_desc">UDI ↓ highest</option>
+      <option value="ASE_asc">ASE ↑ lowest</option>
+      <option value="Depth_asc">Depth ↑</option>
+    </select>
+  </div>
+
+  <button class="hdr-btn" onclick="resetAll()">↺ Reset</button>
+  <button class="hdr-btn" onclick="saveSelection()">↓ Save Selection</button>
+
+  <label id="load-label" for="file-input">⬆ Load CSV</label>
+  <input type="file" id="file-input" accept=".csv" onchange="loadCSV(event)"/>
+
+  <button class="hdr-btn primary" onclick="loadDemo()">Load Demo</button>
+</div>
+
+<div id="shell">
+  <!-- ── PARALLEL COORDINATES ── -->
+  <div id="pc-section">
+    <div id="pc-bar">
+      <span class="pc-bar-label">Input Parameters</span>
+      <div class="pc-bar-sep"></div>
+      <span class="pc-bar-label" style="color:var(--blue)">Daylight Performance</span>
+      <div class="pc-bar-sep out"></div>
+    </div>
+    <svg id="pc-svg"></svg>
+  </div>
+
+  <!-- ── RESULTS ── -->
+  <div id="results-section">
+    <div id="results-bar">
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--sda-hi)"></div>sDA ≥ 55% (LEED EQ8.1)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--sda-mid)"></div>sDA 40–55%</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--sda-lo)"></div>sDA &lt; 40%</div>
+      <div class="legend-item" style="margin-left:8px"><div class="legend-swatch" style="background:rgba(30,63,110,.4);border:1px solid var(--blue)"></div>All runs (unfiltered)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--gold);border:1px solid var(--gold)"></div>Brushed / filtered</div>
+      <span class="results-hint">Drag axis bands to filter · Click thumbnail to inspect</span>
+    </div>
+
+    <div id="thumbs-container">
+      <div id="empty-state" class="visible">
+        <div id="empty-icon">☀</div>
+        <div id="empty-title">NO DATA LOADED</div>
+        <div id="empty-sub">
+          Click <strong>Load Demo</strong> to explore the synthetic 240-run dataset.<br/>
+          Or click <strong>Load CSV</strong> to import your real ClimateStudio results.<br/><br/>
+          CSV columns: <code>IN:Depth_ft, IN:WWR, IN:VLT, IN:Ceiling_ft,<br/>
+          IN:Orientation, IN:Shading_m, OUT:sDA_%, OUT:DA_%, OUT:UDI_%, OUT:ASE_%, img</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DETAIL PANEL ── -->
+<div id="detail-panel">
+  <div id="detail-header">
+    <div id="detail-title">—</div>
+    <button id="detail-close" onclick="closeDetail()">✕</button>
+  </div>
+  <div id="detail-body"></div>
+</div>
+
+<div id="footnote">
+  <em>Pittsburgh Daylight Explorer</em> · Parametric matrix: Latin Hypercube Sampling.
+  Metrics: sDA (IES LM-83, 300 lux / 50%), DA (300 lux), UDI (100–2000 lux), ASE₁₀₀₀,₂₅₀.
+  Climate: Pittsburgh TMY3 (PIT). · <em>Replace demo data with your ClimateStudio export to activate real results.</em>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
+<script>
+// ─── AXIS DEFINITIONS ──────────────────────────────────────────
+const AXES = [
+  // ── inputs (black labels) ──
+  { key:'IN:Depth_ft',    label:'Depth [ft]',    kind:'num',  type:'in',
+    domain:[20,60],   ticks:[20,28,36,44,52,60], fmt:v=>v },
+
+  { key:'IN:Ceiling_ft',  label:'Height [ft]',   kind:'num',  type:'in',
+    domain:[9,13],    ticks:[9,10,11,13],         fmt:v=>v },
+
+  { key:'IN:Orientation', label:'Orientation',   kind:'cat',  type:'in',
+    domain:['N','NE','E','SE','S','SW','W','NW'] },
+
+  { key:'IN:WWR',         label:'WWR',           kind:'num',  type:'in',
+    domain:[0.25,0.65], ticks:[0.25,0.35,0.45,0.55,0.65],
+    fmt:v=>`${Math.round(v*100)}%` },
+
+  { key:'IN:VLT',         label:'VLT',           kind:'num',  type:'in',
+    domain:[0.42,0.72], ticks:[0.42,0.52,0.65,0.72], fmt:v=>v.toFixed(2) },
+
+  { key:'IN:Shading_m',   label:'SHD [m]',       kind:'num',  type:'in',
+    domain:[0,0.6],   ticks:[0,0.3,0.6],          fmt:v=>v },
+
+  // ── outputs (blue labels) ──
+  { key:'OUT:sDA_%',  label:'sDA [%]',  kind:'num', type:'out',
+    domain:[40,100], ticks:[40,50,60,70,80,90,100],
+    fmt:v=>v, threshold:55, thresholdLabel:'55% LEED' },
+
+  { key:'OUT:DA_%',   label:'DA [%]',   kind:'num', type:'out',
+    domain:[30,100], ticks:[30,50,70,90,100],
+    fmt:v=>v, threshold:50, thresholdLabel:'50%' },
+
+  { key:'OUT:UDI_%',  label:'UDI [%]',  kind:'num', type:'out',
+    domain:[10,90],  ticks:[10,30,50,70,90],
+    fmt:v=>v, threshold:50, thresholdLabel:'50%' },
+
+  { key:'OUT:ASE_%',  label:'ASE [%]',  kind:'num', type:'out',
+    domain:[0,55],   ticks:[0,10,20,30,40,50],
+    fmt:v=>v, threshold:10, thresholdLabel:'<10%' },
+];
+
+// ─── STATE ────────────────────────────────────────────────────
+let allData    = [];          // full dataset
+let brushState = {};          // axis key → [lo,hi] for num; [val,...] for cat
+let selectedId = null;        // currently open detail card
+let xScale, yScales = {};
+
+const PC_H    = 200;
+const MARGIN  = { top:32, bottom:8, left:20, right:20 };
+
+// ─── COLOUR HELPERS ───────────────────────────────────────────
+function sdaColor(v) {
+  if (v >= 55) return getComputedStyle(document.documentElement).getPropertyValue('--sda-hi').trim();
+  if (v >= 40) return getComputedStyle(document.documentElement).getPropertyValue('--sda-mid').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--sda-lo').trim();
+}
+function sdaLabel(v) {
+  if (v >= 55) return 'Excellent';
+  if (v >= 40) return 'Good';
+  return 'Poor';
+}
+
+// ─── PER-AXIS COLOUR SCALES ─────────────────────────────────
+function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+
+function axisColor(key, val) {
+  const v = +val;
+  switch(key) {
+    case 'IN:Depth_ft':    // green(shallow) → amber(deep)
+      return d3.interpolateRgb('#1a6b42','#b8651a')(clamp01((v - 20) / 40));
+    case 'IN:Ceiling_ft':  // amber(low) → green(tall)
+      return d3.interpolateRgb('#b8651a','#1a6b42')(clamp01((v - 9) / 4));
+    case 'IN:Orientation': return '#9e9488';
+    case 'IN:WWR':         // neutral(low) → green(high)
+      return d3.interpolateRgb('#9e9488','#1a6b42')(clamp01((v - 0.25) / 0.4));
+    case 'IN:VLT':         return '#9e9488';
+    case 'IN:Shading_m':   return '#9e9488';
+    case 'OUT:sDA_%':      // red(low) → green(high)
+      return d3.interpolateRgb('#8b2020','#1a6b42')(clamp01((v - 40) / 60));
+    case 'OUT:DA_%':       // red(low) → green(high)
+      return d3.interpolateRgb('#8b2020','#1a6b42')(clamp01((v - 30) / 70));
+    case 'OUT:UDI_%': {    // neutral → green(40-80) → neutral
+      const t = clamp01(1 - Math.abs(v - 60) / 25);
+      return d3.interpolateRgb('#9e9488','#1a6b42')(t);
+    }
+    case 'OUT:ASE_%':      // green(low) → red(high)
+      return d3.interpolateRgb('#1a6b42','#8b2020')(clamp01(v / 55));
+    default: return '#9e9488';
+  }
+}
+
+// ─── FILTER ───────────────────────────────────────────────────
+function filteredData() {
+  return allData.filter(d => {
+    for (const ax of AXES) {
+      const b = brushState[ax.key];
+      if (!b) continue;
+      if (ax.kind === 'num') {
+        if (+d[ax.key] < b[0] || +d[ax.key] > b[1]) return false;
+      } else {
+        if (b.length && !b.includes(d[ax.key])) return false;
+      }
+    }
+    return true;
+  });
+}
+
+function updateCounter() {
+  const n = filteredData().length;
+  document.getElementById('count-num').textContent = n;
+  document.getElementById('count-of').textContent  = `/ ${allData.length}`;
+}
+
+// ─── PARALLEL COORDINATES ─────────────────────────────────────
+function buildPC() {
+  const svgEl = document.getElementById('pc-svg');
+  const W = svgEl.parentElement.clientWidth - MARGIN.left - MARGIN.right;
+  svgEl.setAttribute('height', PC_H + MARGIN.top + MARGIN.bottom);
+
+  const svg = d3.select('#pc-svg');
+  svg.selectAll('*').remove();
+  const defs = svg.append('defs');
+  const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+
+  // x position per axis
+  xScale = d3.scalePoint()
+    .domain(AXES.map(a => a.key))
+    .range([0, W])
+    .padding(0.08);
+
+  // y scale per axis
+  AXES.forEach(ax => {
+    if (ax.kind === 'num') {
+      yScales[ax.key] = d3.scaleLinear().domain(ax.domain).range([PC_H, 0]);
+    } else {
+      yScales[ax.key] = d3.scalePoint().domain(ax.domain).range([PC_H, 0]).padding(0.3);
+    }
+  });
+
+  // ── draw lines ──
+  drawLines(g, W, defs);
+
+  // ── draw axes ──
+  AXES.forEach(ax => {
+    const x = xScale(ax.key);
+    const ag = g.append('g').attr('transform', `translate(${x},0)`);
+
+    // vertical axis line
+    ag.append('line').attr('class','axis-line').attr('y1',0).attr('y2',PC_H);
+
+    // label
+    ag.append('text')
+      .attr('class', ax.type==='in' ? 'axis-label-input' : 'axis-label-output')
+      .attr('text-anchor','middle')
+      .attr('y', -18)
+      .text(ax.label);
+
+    // type tag
+    ag.append('text')
+      .attr('class','axis-type-tag')
+      .attr('text-anchor','middle')
+      .attr('y', -28)
+      .attr('fill', ax.type==='in' ? '#9e9488' : '#1e3f6e')
+      .text(ax.type==='in' ? 'INPUT' : 'OUTPUT');
+
+    // ticks
+    if (ax.kind === 'num' && ax.ticks) {
+      ax.ticks.forEach(t => {
+        const y = yScales[ax.key](t);
+        ag.append('line').attr('x1',-3).attr('x2',0).attr('y1',y).attr('y2',y)
+          .attr('stroke','#c0b9ac').attr('stroke-width',1);
+        ag.append('text').attr('class','tick-val')
+          .attr('x',-6).attr('y',y+3).attr('text-anchor','end')
+          .text(ax.fmt ? ax.fmt(t) : t);
+      });
+    } else if (ax.kind === 'cat') {
+      ax.domain.forEach(val => {
+        const y = yScales[ax.key](val);
+        ag.append('text').attr('class','tick-val')
+          .attr('x',-6).attr('y',y+3).attr('text-anchor','end')
+          .text(val);
+      });
+    }
+
+    // threshold line for outputs
+    if (ax.threshold !== undefined) {
+      const ty = yScales[ax.key](ax.threshold);
+      if (ty >= 0 && ty <= PC_H) {
+        ag.append('line').attr('class','threshold-dash')
+          .attr('x1',-28).attr('x2',28).attr('y1',ty).attr('y2',ty);
+        ag.append('text').attr('class','threshold-lbl')
+          .attr('x',6).attr('y',ty-3).text(ax.thresholdLabel);
+      }
+    }
+
+    // brush overlay
+    if (ax.kind === 'num') attachBrush(ag, ax);
+  });
+}
+
+function drawLines(g, W, defs) {
+  if (!allData.length) return;
+  const filtered = new Set(filteredData().map(d => rowId(d)));
+
+  allData.forEach((d, i) => {
+    const rid = rowId(d);
+    const inF = filtered.has(rid);
+    const isSel = rid === selectedId;
+
+    const rowG = g.append('g')
+      .attr('class', 'pc-row')
+      .datum(d)
+      .style('opacity', isSel ? 1 : inF ? 0.6 : 0.05)
+      .on('click', (evt, dd) => openDetail(dd));
+
+    for (let j = 0; j < AXES.length - 1; j++) {
+      const ax1 = AXES[j], ax2 = AXES[j + 1];
+      const x1 = xScale(ax1.key), x2 = xScale(ax2.key);
+      const raw1 = d[ax1.key], raw2 = d[ax2.key];
+      const py1 = ax1.kind === 'num' ? yScales[ax1.key](+raw1) : yScales[ax1.key](raw1);
+      const py2 = ax2.kind === 'num' ? yScales[ax2.key](+raw2) : yScales[ax2.key](raw2);
+      const fy1 = isNaN(py1) ? PC_H / 2 : py1;
+      const fy2 = isNaN(py2) ? PC_H / 2 : py2;
+
+      const c1 = axisColor(ax1.key, raw1);
+      const c2 = axisColor(ax2.key, raw2);
+      const gid = `sg${i}x${j}`;
+      const grad = defs.append('linearGradient')
+        .attr('id', gid)
+        .attr('gradientUnits', 'userSpaceOnUse')
+        .attr('x1', x1).attr('y1', 0)
+        .attr('x2', x2).attr('y2', 0);
+      grad.append('stop').attr('offset', '0%').attr('stop-color', c1);
+      grad.append('stop').attr('offset', '100%').attr('stop-color', c2);
+
+      const dx = (x2 - x1) * 0.4;
+      rowG.append('path')
+        .attr('d', `M${x1},${fy1} C${x1+dx},${fy1} ${x2-dx},${fy2} ${x2},${fy2}`)
+        .attr('stroke', isSel ? '#e00' : inF ? '#e00' : '#c0b9ac')
+        .attr('stroke-width', isSel ? 2.5 : inF ? 1.3 : 0.8);
+    }
+  });
+}
+
+function refreshLines() {
+  const filtered = new Set(filteredData().map(d => rowId(d)));
+  d3.selectAll('.pc-row').each(function(d) {
+    const inF = filtered.has(rowId(d));
+    const isSel = rowId(d) === selectedId;
+    d3.select(this)
+      .style('opacity', isSel ? 1 : inF ? 0.6 : 0.15)
+      .selectAll('path')
+      .attr('stroke', isSel ? '#e00' : inF ? '#e00' : '#c0b9ac')
+      .attr('stroke-width', isSel ? 2.5 : inF ? 1.3 : 0.8);
+  });
+}
+
+function rowId(d) { return d['img'] || (d['IN:Depth_ft']+'_'+d['IN:Orientation']+'_'+d['OUT:sDA_%']); }
+
+// ─── BRUSH ────────────────────────────────────────────────────
+function attachBrush(ag, ax) {
+  const ys = yScales[ax.key];
+  let startY = null, rect = null;
+
+  ag.append('rect')
+    .attr('x',-16).attr('width',32)
+    .attr('y',0).attr('height',PC_H)
+    .attr('fill','transparent')
+    .attr('cursor','crosshair')
+    .call(d3.drag()
+      .on('start', function(evt) {
+        startY = Math.max(0, Math.min(PC_H, evt.y));
+        if (rect) rect.remove();
+        rect = ag.append('rect').attr('class','brush-sel');
+      })
+      .on('drag', function(evt) {
+        if (startY === null) return;
+        const endY = Math.max(0, Math.min(PC_H, evt.y));
+        const y1 = Math.min(startY, endY);
+        const y2 = Math.max(startY, endY);
+        rect.attr('x',-14).attr('width',28).attr('y',y1).attr('height',Math.max(2,y2-y1));
+        brushState[ax.key] = [ys.invert(y2), ys.invert(y1)];
+        updateCounter();
+        refreshLines();
+        renderThumbs();
+      })
+      .on('end', function(evt) {
+        const endY = Math.max(0, Math.min(PC_H, evt.y));
+        if (Math.abs(endY - startY) < 4) {
+          if (rect) { rect.remove(); rect = null; }
+          delete brushState[ax.key];
+          updateCounter();
+          refreshLines();
+          renderThumbs();
+        }
+        startY = null;
+      })
+    );
+}
+
+// ─── THUMBNAILS ───────────────────────────────────────────────
+function renderThumbs() {
+  const container = document.getElementById('thumbs-container');
+  const empty     = document.getElementById('empty-state');
+
+  if (!allData.length) {
+    empty.classList.add('visible');
+    return;
+  }
+  empty.classList.remove('visible');
+
+  const fd  = filteredData();
+  const sortVal = document.getElementById('sort-select').value;
+  const sorted = [...fd].sort((a, b) => {
+    switch(sortVal) {
+      case 'sDA_desc':  return +b['OUT:sDA_%'] - +a['OUT:sDA_%'];
+      case 'DA_desc':   return +b['OUT:DA_%']  - +a['OUT:DA_%'];
+      case 'UDI_desc':  return +b['OUT:UDI_%'] - +a['OUT:UDI_%'];
+      case 'ASE_asc':   return +a['OUT:ASE_%'] - +b['OUT:ASE_%'];
+      case 'Depth_asc': return +a['IN:Depth_ft']- +b['IN:Depth_ft'];
+      default: return 0;
+    }
+  });
+
+  // Dimmed set (all data minus filtered)
+  const filteredSet = new Set(fd.map(rowId));
+
+  // Build cards — only show filtered, dimmed others removed for performance
+  const MAX_SHOW = 500;
+  const toShow = allData.length <= MAX_SHOW
+    ? allData.map(d => ({ d, inFilter: filteredSet.has(rowId(d)) }))
+    : sorted.slice(0, MAX_SHOW).map(d => ({ d, inFilter: true }));
+
+  // Sort the full visible list: filtered first
+  toShow.sort((a, b) => (b.inFilter ? 1 : 0) - (a.inFilter ? 1 : 0));
+
+  container.innerHTML = toShow.map(({ d, inFilter }, i) => {
+    const sda  = +d['OUT:sDA_%'];
+    const da   = +d['OUT:DA_%'];
+    const udi  = +d['OUT:UDI_%'];
+    const ase  = +d['OUT:ASE_%'];
+    const sc   = sdaColor(sda);
+    const rid  = rowId(d);
+    const isSel = rid === selectedId;
+    const dimmed = !inFilter;
+    const imgPath = d['img'] || '';
+
+    return `<div class="thumb-card card-appear ${isSel?'selected':''} ${dimmed?'dimmed':''}"
+      style="animation-delay:${Math.min(i,60)*6}ms"
+      data-rid="${rid.replace(/"/g,'&quot;')}"
+      onclick="openDetailFromCard(this)">
+
+      <div class="card-strip" style="background:${sc}"></div>
+
+      <div class="card-img-wrap">
+        ${imgPath
+          ? `<img src="${imgPath}" alt="Heatmap" onerror="this.style.display='none'">`
+          : ''}
+        <div class="card-img-placeholder">ILLUMINANCE MAP</div>
+        <div class="card-run-id">${d['img']?.match(/R\d+/)?.[0] || i+1}</div>
+      </div>
+
+      <div class="card-body">
+        <div class="card-kpis">
+          <div class="card-kpi">
+            <div class="card-kpi-label">sDA</div>
+            <div class="card-kpi-val" style="color:${sc}">${sda}%</div>
+          </div>
+          <div class="card-kpi">
+            <div class="card-kpi-label">UDI</div>
+            <div class="card-kpi-val" style="color:var(--teal)">${udi}%</div>
+          </div>
+          <div class="card-kpi">
+            <div class="card-kpi-label">DA</div>
+            <div class="card-kpi-val" style="color:var(--blue)">${da}%</div>
+          </div>
+          <div class="card-kpi">
+            <div class="card-kpi-label">ASE</div>
+            <div class="card-kpi-val" style="color:${ase>10?'var(--sda-lo)':'var(--ink3)'}">${ase}%</div>
+          </div>
+        </div>
+
+        <div class="card-params">
+          <span>${d['IN:Orientation']}</span> ·
+          WWR <span>${Math.round(+d['IN:WWR']*100)}%</span> ·
+          VLT <span>${(+d['IN:VLT']).toFixed(2)}</span><br/>
+          Depth <span>${d['IN:Depth_ft']}ft</span> ·
+          Ceil <span>${d['IN:Ceiling_ft']}ft</span> ·
+          SHD <span>${d['IN:Shading_m']}m</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Open detail by reading data-rid from card
+function openDetailFromCard(el) {
+  const rid = el.dataset.rid;
+  const d = allData.find(r => rowId(r) === rid);
+  if (d) openDetail(d);
+}
+
+// ─── DETAIL PANEL ─────────────────────────────────────────────
+function openDetail(d) {
+  selectedId = rowId(d);
+  refreshLines();
+  renderThumbs();
+
+  const sda = +d['OUT:sDA_%'];
+  const da  = +d['OUT:DA_%'];
+  const udi = +d['OUT:UDI_%'];
+  const ase = +d['OUT:ASE_%'];
+  const sc  = sdaColor(sda);
+
+  const allSDA = allData.map(r => +r['OUT:sDA_%']);
+  const allDA  = allData.map(r => +r['OUT:DA_%']);
+  const allUDI = allData.map(r => +r['OUT:UDI_%']);
+  const allASE = allData.map(r => +r['OUT:ASE_%']);
+
+  function pctInRange(val, vals) {
+    const mn=Math.min(...vals), mx=Math.max(...vals);
+    return mx===mn ? 50 : Math.round((val-mn)/(mx-mn)*100);
+  }
+
+  document.getElementById('detail-title').textContent =
+    `${d['IN:Orientation']} · ${d['IN:Depth_ft']}ft · WWR ${Math.round(+d['IN:WWR']*100)}%`;
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-label">Daylight Metrics</div>
+      <div class="detail-kpi-grid">
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">sDA</div>
+          <div class="detail-kpi-val" style="color:${sc}">${sda}</div>
+          <div class="detail-kpi-desc">% — ${sdaLabel(sda)}</div>
+        </div>
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">DA</div>
+          <div class="detail-kpi-val" style="color:var(--blue)">${da}</div>
+          <div class="detail-kpi-desc">% — Daylight Autonomy</div>
+        </div>
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">UDI</div>
+          <div class="detail-kpi-val" style="color:var(--teal)">${udi}</div>
+          <div class="detail-kpi-desc">% — Useful 100–2000 lux</div>
+        </div>
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">ASE</div>
+          <div class="detail-kpi-val" style="color:${ase>10?'var(--sda-lo)':'var(--ink3)'}">${ase}</div>
+          <div class="detail-kpi-desc">% — Glare exposure${ase>10?' ⚠ >10% limit':' ✓ within limit'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-label">Position in Dataset</div>
+      ${[
+        {label:'sDA',val:sda,all:allSDA,color:sc},
+        {label:'DA', val:da, all:allDA, color:'var(--blue)'},
+        {label:'UDI',val:udi,all:allUDI,color:'var(--teal)'},
+        {label:'ASE',val:ase,all:allASE,color:ase>10?'var(--sda-lo)':'var(--teal)'},
+      ].map(({label,val,all,color}) => `
+        <div class="ctx-row">
+          <span class="ctx-label">${label}</span>
+          <div class="ctx-track">
+            <div class="ctx-fill" style="width:${pctInRange(val,all)}%;background:${color}"></div>
+          </div>
+          <span class="ctx-val" style="color:${color}">${val}%</span>
+        </div>`).join('')}
+      ${sda>=55
+        ? `<div style="font-family:var(--ff-mono);font-size:8px;color:var(--sda-hi);margin-top:6px">✓ Meets LEED EQ8.1 sDA ≥ 55%</div>`
+        : `<div style="font-family:var(--ff-mono);font-size:8px;color:var(--sda-lo);margin-top:6px">✗ Below LEED target. Gap: ${(55-sda).toFixed(1)}pts</div>`
+      }
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-label">Input Parameters</div>
+      <table class="param-table">
+        <tr><td>Unit Depth</td><td>${d['IN:Depth_ft']} ft</td></tr>
+        <tr><td>Ceiling Height</td><td>${d['IN:Ceiling_ft']} ft</td></tr>
+        <tr><td>D/H Ratio</td><td>${(+d['IN:Depth_ft'] / +d['IN:Ceiling_ft']).toFixed(2)} : 1</td></tr>
+        <tr><td>Orientation</td><td>${d['IN:Orientation']}</td></tr>
+        <tr><td>WWR</td><td>${Math.round(+d['IN:WWR']*100)}%</td></tr>
+        <tr><td>Glazing VLT</td><td>${(+d['IN:VLT']).toFixed(2)}</td></tr>
+        <tr><td>Shading Depth</td><td>${d['IN:Shading_m']} m${+d['IN:Shading_m']===0?' (none)':''}</td></tr>
+      </table>
+    </div>
+
+    <div style="font-family:var(--ff-mono);font-size:8px;color:var(--ink4);line-height:1.9;border-top:1px solid var(--border);padding-top:8px">
+      Place ClimateStudio illuminance map as <strong>${d['img']||'img/R___.png'}</strong><br/>
+      adjacent to index.html to display the real heatmap image.
+    </div>
+  `;
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closeDetail() {
+  selectedId = null;
+  document.getElementById('detail-panel').classList.remove('open');
+  refreshLines();
+  renderThumbs();
+}
+
+// ─── RESET ────────────────────────────────────────────────────
+function resetAll() {
+  brushState = {};
+  selectedId = null;
+  d3.selectAll('.brush-sel').remove();
+  updateCounter();
+  buildPC();
+  renderThumbs();
+  closeDetail();
+}
+
+// ─── SAVE SELECTION ───────────────────────────────────────────
+function saveSelection() {
+  const fd = filteredData();
+  if (!fd.length) { alert('No runs in current selection.'); return; }
+  const keys = Object.keys(fd[0]);
+  const csv = [keys.join(','), ...fd.map(r => keys.map(k => r[k]).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'daylight_selection.csv';
+  a.click();
+}
+
+// ─── CSV LOADER ───────────────────────────────────────────────
+function loadCSV(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    parseAndLoad(e.target.result);
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+function parseAndLoad(csvText) {
+  const parsed = d3.csvParse(csvText);
+  if (!parsed.length) { alert('Empty or invalid CSV.'); return; }
+  allData = parsed;
+  brushState = {};
+  selectedId = null;
+  updateCounter();
+  buildPC();
+  renderThumbs();
+}
+
+// ─── DEMO DATA ────────────────────────────────────────────────
+function loadDemo() {
+  d3.csv('data.csv').then(data => {
+    allData = data;
+    brushState = {};
+    selectedId = null;
+    updateCounter();
+    buildPC();
+    renderThumbs();
+  }).catch(() => {
+    alert('data.csv not found. Make sure index.html and data.csv are in the same folder.');
+  });
+}
+
+// ─── RESIZE ───────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  if (allData.length) buildPC();
+});
+
+// ─── INIT ─────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // Auto-load demo if data.csv is present
+  loadDemo();
+});
+</script>
+</body>
+</html>
